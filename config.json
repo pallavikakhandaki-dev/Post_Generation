@@ -1,0 +1,57 @@
+{
+  "canvas": {
+    "width": 1080,
+    "height": 1080,
+    "background_color": "#f5f7fb"
+  },
+  "default_font_path": "assets\\fonts\\ArchivoBlack-Regular.ttf",
+  "templates": {
+    "employee_birthday": {
+      "path": "templates/birthday.png",
+      "name_font_path": "assets\\fonts\\ArchivoBlack-Regular.ttf",
+      "name_box": {
+        "x": 1120,
+        "y": 980,
+        "width": 780,
+        "height": 140
+      },
+      "photo_box": {
+        "x": -248,
+        "y": 383,
+        "width": 1248,
+        "height": 1248,
+        "photo_scale": 1.0,
+        "photo_offset_x": 0,
+        "photo_offset_y": 50,
+        "focus_x": 0.5,
+        "focus_y": 0.5,
+        "photo_top_percent": 0.65,
+        "photo_bg_color": "#cccccc"
+      },
+      "photo_shape": "circle",
+      "photo_fit": "contain",
+      "photo_anchor": "top",
+      "source_mode": "raw",
+      "remove_background": false,
+      "bg_method": "rembg",
+      "bg_tolerance": 44,
+      "name_uppercase": true,
+      "name_color": "#f3f3f3",
+      "max_font_size": 82,
+      "min_font_size": 44,
+      "text_align": "center",
+      "template_type": "employee",
+      "logo_path": "assets/logo/employee_birthday_logo.png",
+      "logo_box": {
+        "x": 0,
+        "y": 0,
+        "width": 364,
+        "height": 279
+      }
+    }
+  },
+  "output": {
+    "directory": "output",
+    "image_format": "PNG"
+  }
+}

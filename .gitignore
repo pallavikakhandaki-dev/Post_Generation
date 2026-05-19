@@ -1,0 +1,9 @@
+.venv/
+__pycache__/
+output/
+.u2net/
+node_modules/
+assets/photos/
+*.jpg
+*.jpeg
+*.webp
