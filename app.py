@@ -114,10 +114,9 @@ config = load_config(CONFIG_PATH)
 left, right = st.columns([1, 1.35], gap="large")
 with left:
     uploaded = st.file_uploader("Upload employee photo", type=["png", "jpg", "jpeg", "webp"])
-    name = st.text_input("Employee name", value="Ajinkya Jawalekar")
+    name = st.text_input("Employee name", value="", placeholder="Enter a name")
 
     occasion = "employee_birthday"
-    st.caption("Template: Employee Birthday")
 
     tcfg = config["templates"][occasion]
     default_photo_box = tcfg["photo_box"]
