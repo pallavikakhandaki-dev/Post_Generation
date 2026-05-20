@@ -58,35 +58,9 @@ Then open:
 UI flow:
 1. Upload employee photo
 2. Enter employee name
-3. Select poster type (`Employee` / `Manager`)
-4. Select template
-5. Adjust sliders (zoom, move, name settings if needed)
-6. Download final PNG
+3. Adjust sliders (zoom, move, name settings if needed)
+4. Download final PNG
 
-## 3. Run Batch CSV Generator (Optional)
-
-```powershell
-python src/generate_posts.py --config config.json --input input/posts.csv
-```
-
-Generated files are saved under:
-- `output/<date>/...`
-
-## CSV Format
-
-`input/posts.csv`
-
-```csv
-occasion,employee_name,photo_path,date
-employee_birthday,Ajinkya Jawalekar,assets/photos/Ajinkya Jawalekar.png,2026-05-19
-manager_birthday,Akshay Deshmukh,assets/photos/Akshay_Deshmukh.png,2026-05-19
-```
-
-Fields:
-- `occasion`: Must match a key inside `config.json -> templates`
-- `employee_name`: Name text to render
-- `photo_path`: Local path or image URL
-- `date`: Output subfolder name
 
 ## 4. Change Name Font
 
