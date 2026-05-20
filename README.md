@@ -62,7 +62,7 @@ UI flow:
 4. Download final PNG
 
 
-## 4. Change Name Font
+## 3. Change Name Font
 
 Use template-specific font via `name_font_path` in `config.json`:
 
@@ -80,7 +80,7 @@ You can also use a Windows font directly:
 
 If font file is missing, default font is used.
 
-## 5. Important Config Keys
+## 4. Important Config Keys
 
 In each template block (`config.json -> templates -> <template_key>`):
 - `path`: Template PNG path
