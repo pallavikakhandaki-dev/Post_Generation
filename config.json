@@ -10,10 +10,10 @@
       "path": "templates/birthday.png",
       "name_font_path": "assets/fonts/Anton-Regular.ttf",
       "name_box": {
-        "x": 1120,
-        "y": 980,
-        "width": 780,
-        "height": 140
+        "x": 1080,
+        "y": 930,
+        "width": 860,
+        "height": 170
       },
       "photo_box": {
         "x": -248,
@@ -37,8 +37,8 @@
       "bg_tolerance": 44,
       "name_uppercase": true,
       "name_color": "#f3f3f3",
-      "max_font_size": 82,
-      "min_font_size": 44,
+      "max_font_size": 102,
+      "min_font_size": 56,
       "text_align": "center",
       "template_type": "employee",
       "logo_path": "assets/logo/employee_birthday_logo.png",
