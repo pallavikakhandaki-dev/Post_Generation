@@ -8,7 +8,7 @@
   "templates": {
     "employee_birthday": {
       "path": "templates/birthday.png",
-      "name_font_path": "assets/fonts/Aton-Regular.ttf",
+      "name_font_path": "assets/fonts/Anton-Regular.ttf",
       "name_box": {
         "x": 1120,
         "y": 980,
