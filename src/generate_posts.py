@@ -33,7 +33,11 @@ def ensure_dir(path: Path) -> None:
 def get_font(font_path: Path, size: int) -> ImageFont.FreeTypeFont:
     if font_path.exists():
         return ImageFont.truetype(str(font_path), size=size)
-    return ImageFont.load_default()
+    try:
+        # Use a scalable fallback on Linux/HF so text size still respects `size`.
+        return ImageFont.truetype("DejaVuSans-Bold.ttf", size=size)
+    except Exception:
+        return ImageFont.load_default()
 
 
 def make_default_template(path: Path, occasion: str, canvas: Dict) -> None:
@@ -472,4 +476,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

@@ -117,7 +117,7 @@ with left:
     name = st.text_input("Employee name", value="Ajinkya Jawalekar")
 
     occasion = "employee_birthday"
-    st.text_input("Template", value=occasion, disabled=True)
+    st.caption("Template: Employee Birthday")
 
     tcfg = config["templates"][occasion]
     default_photo_box = tcfg["photo_box"]
