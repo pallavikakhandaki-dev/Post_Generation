@@ -111,8 +111,8 @@
       "ordinal_suffix_raise": -1,
       "description_font_size": 24,
       "designation_font_path": "assets/fonts/Swiss 721 BT.ttf",
-      "description_font_path": "assets/fonts/ARIAL.TTF",
-      "description_bold_font_path": "C:/Windows/Fonts/arialbd.ttf"
+      "description_font_path": "assets/fonts/tahoma.ttf",
+      "description_bold_font_path": "assets/fonts/tahomabd.ttf"
     }
   },
   "output": {
