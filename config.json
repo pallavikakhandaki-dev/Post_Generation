@@ -48,6 +48,71 @@
         "width": 364,
         "height": 279
       }
+    },
+    "employee_anniversary": {
+      "path": "templates/anniversary.jpg",
+      "name_font_path": "assets/fonts/tahomabd.ttf",
+      "photo_box": {
+        "x": 49,
+        "y": 331,
+        "width": 447,
+        "height": 596,
+        "photo_scale": 1.0,
+        "photo_offset_x": 0,
+        "photo_offset_y": 0,
+        "focus_x": 0.5,
+        "focus_y": 0.5,
+        "photo_top_percent": 0.72
+      },
+      "photo_shape": "rectangle",
+      "photo_fit": "cover",
+      "photo_anchor": "top",
+      "source_mode": "raw",
+      "remove_background": false,
+      "name_uppercase": false,
+      "designation_uppercase": false,
+      "name_box": {
+        "x": 530,
+        "y": 604,
+        "width": 510,
+        "height": 46
+      },
+      "designation_box": {
+        "x": 530,
+        "y": 656,
+        "width": 510,
+        "height": 38
+      },
+      "ordinal_box": {
+        "x": 532,
+        "y": 338,
+        "width": 108,
+        "height": 58
+      },
+      "description_box": {
+        "x": 530,
+        "y": 720,
+        "width": 500,
+        "height": 240
+      },
+      "name_color": "#ffffff",
+      "designation_color": "#000000",
+      "ordinal_color": "#2f3137",
+      "name_align": "left",
+      "designation_align": "left",
+      "description_color": "#f4f4f4",
+      "draw_description": true,
+      "max_font_size": 39,
+      "min_font_size": 24,
+      "designation_font_size": 34,
+      "ordinal_font_size": 58,
+      "ordinal_suffix_gap": 1,
+      "ordinal_suffix_scale": 0.62,
+      "ordinal_suffix_raise": -1,
+      "description_font_size": 24,
+      "designation_font_path": "assets/fonts/Swiss 721 BT.ttf",
+      "description_font_path": "assets/fonts/ARIAL.TTF",
+      "description_bold_font_path": "C:/Windows/Fonts/arialbd.ttf"
     }
   },
   "output": {
