@@ -299,12 +299,78 @@ def paste_photo(
     box_layer.paste(resized, (local_x, local_y), resized if resized.mode == "RGBA" else None)
 
     if shape == "circle":
-        # Keep existing transparency from pasted portrait and only clip to circle.
         circle_mask = Image.new("L", (bw, bh), 0)
         mdraw = ImageDraw.Draw(circle_mask)
         mdraw.ellipse((0, 0, bw - 1, bh - 1), fill=255)
         existing_alpha = box_layer.getchannel("A")
         clipped_alpha = ImageChops.multiply(existing_alpha, circle_mask)
+        box_layer.putalpha(clipped_alpha)
+
+    elif shape == "diamond":
+        diamond_mask = Image.new("L", (bw, bh), 0)
+        mdraw = ImageDraw.Draw(diamond_mask)
+        cx, cy = bw // 2, bh // 2
+        mdraw.polygon([(cx, 0), (bw - 1, cy), (cx, bh - 1), (0, cy)], fill=255)
+        existing_alpha = box_layer.getchannel("A")
+        clipped_alpha = ImageChops.multiply(existing_alpha, diamond_mask)
+        box_layer.putalpha(clipped_alpha)
+
+    elif shape == "kite":
+        # Asymmetric diamond clipped to the photo box.
+        # kite_top_y / kite_bottom_y are the absolute y of the full diamond tips.
+        # The photo box (y, height) can start/end inside those tips so the
+        # narrow spike region is not covered by the photo (template shows there).
+        by_abs = int(photo_box["y"])
+        kcy_abs = int(photo_box.get("kite_center_y", by_abs + bh // 2))
+        top_tip = float(photo_box.get("kite_top_y", by_abs))
+        bot_tip = float(photo_box.get("kite_bottom_y", by_abs + bh))
+        ys_m, xs_m = np.mgrid[0:bh, 0:bw].astype(float)
+        y_abs_m = ys_m + by_abs
+        cx_m = (bw - 1) / 2.0
+        max_rx = (bw - 1) / 2.0
+        is_upper = y_abs_m <= kcy_abs
+        hw_upper = max_rx * np.maximum(0.0, y_abs_m - top_tip) / max(1.0, kcy_abs - top_tip)
+        hw_lower = max_rx * np.maximum(0.0, bot_tip - y_abs_m) / max(1.0, bot_tip - kcy_abs)
+        hw = np.where(is_upper, hw_upper, hw_lower)
+        kite_arr = np.where(np.abs(xs_m - cx_m) <= hw, 255, 0).astype(np.uint8)
+        kite_mask = Image.fromarray(kite_arr, mode="L")
+        existing_alpha = box_layer.getchannel("A")
+        clipped_alpha = ImageChops.multiply(existing_alpha, kite_mask)
+        box_layer.putalpha(clipped_alpha)
+
+    elif shape == "rounded_rectangle":
+        radius = int(photo_box.get("corner_radius", min(bw, bh) // 6))
+        rr_mask = Image.new("L", (bw, bh), 0)
+        rr_draw = ImageDraw.Draw(rr_mask)
+        try:
+            rr_draw.rounded_rectangle([(0, 0), (bw - 1, bh - 1)], radius=radius, fill=255)
+        except AttributeError:
+            rr_draw.rectangle([(radius, 0), (bw - 1 - radius, bh - 1)], fill=255)
+            rr_draw.rectangle([(0, radius), (bw - 1, bh - 1 - radius)], fill=255)
+            for cx, cy in [(radius, radius), (bw - 1 - radius, radius), (radius, bh - 1 - radius), (bw - 1 - radius, bh - 1 - radius)]:
+                rr_draw.ellipse([(cx - radius, cy - radius), (cx + radius, cy + radius)], fill=255)
+        existing_alpha = box_layer.getchannel("A")
+        clipped_alpha = ImageChops.multiply(existing_alpha, rr_mask)
+        box_layer.putalpha(clipped_alpha)
+
+    elif shape == "rounded_diamond":
+        r = int(photo_box.get("corner_radius", min(bw, bh) // 8))
+        cx_d, cy_d = bw // 2, bh // 2
+        rd_mask = Image.new("L", (bw, bh), 0)
+        rd_draw = ImageDraw.Draw(rd_mask)
+        # Full sharp diamond
+        rd_draw.polygon([(cx_d, 0), (bw - 1, cy_d), (cx_d, bh - 1), (0, cy_d)], fill=255)
+        # Replace each sharp tip with a rounded cap (blank triangle → draw ellipse)
+        rd_draw.polygon([(cx_d, 0), (cx_d + r, r), (cx_d - r, r)], fill=0)
+        rd_draw.ellipse([(cx_d - r, 0), (cx_d + r, 2 * r)], fill=255)
+        rd_draw.polygon([(bw - 1, cy_d), (bw - 1 - r, cy_d - r), (bw - 1 - r, cy_d + r)], fill=0)
+        rd_draw.ellipse([(bw - 1 - 2 * r, cy_d - r), (bw - 1, cy_d + r)], fill=255)
+        rd_draw.polygon([(cx_d, bh - 1), (cx_d + r, bh - 1 - r), (cx_d - r, bh - 1 - r)], fill=0)
+        rd_draw.ellipse([(cx_d - r, bh - 1 - 2 * r), (cx_d + r, bh - 1)], fill=255)
+        rd_draw.polygon([(0, cy_d), (r, cy_d - r), (r, cy_d + r)], fill=0)
+        rd_draw.ellipse([(0, cy_d - r), (2 * r, cy_d + r)], fill=255)
+        existing_alpha = box_layer.getchannel("A")
+        clipped_alpha = ImageChops.multiply(existing_alpha, rd_mask)
         box_layer.putalpha(clipped_alpha)
 
     base.paste(box_layer, (int(photo_box["x"]), int(photo_box["y"])), box_layer)

@@ -3,6 +3,7 @@ from datetime import datetime
 from io import BytesIO
 from pathlib import Path
 
+import numpy as np
 import streamlit as st
 from PIL import Image, ImageDraw, ImageFont
 
@@ -289,11 +290,183 @@ def render_anniversary_preview(
     return base
 
 
+def _make_non_white_overlay(template: Image.Image, threshold: int = 210) -> Image.Image:
+    arr = np.array(template.copy().convert("RGBA"), dtype=np.uint8)
+    is_white = (arr[:, :, 0] > threshold) & (arr[:, :, 1] > threshold) & (arr[:, :, 2] > threshold)
+    arr[is_white, 3] = 0
+    return Image.fromarray(arr)
+
+
+def _cut_rect_hole(template: Image.Image, x: int, y: int, width: int, height: int) -> Image.Image:
+    arr = np.array(template.copy().convert("RGBA"), dtype=np.uint8)
+    arr[y:y + height, x:x + width, 3] = 0
+    return Image.fromarray(arr)
+
+
+def _cut_ring_hole(template: Image.Image, seed_x: int, seed_y: int, thresh: int = 60, expand_px: int = 0) -> Image.Image:
+    """Flood-fill from a seed point inside the gold ring and make those pixels transparent.
+
+    If expand_px > 0, the transparent region is dilated by that many pixels using
+    MaxFilter. This fills in the ring border and the rounded corner areas, effectively
+    making the frame a sharp rectangle with no curved-corner clipping.
+    """
+    from PIL import ImageFilter
+    temp_rgb = template.copy().convert("RGB")
+    marker = (3, 7, 11)
+    ImageDraw.floodfill(temp_rgb, (seed_x, seed_y), marker, thresh=thresh)
+    arr_temp = np.array(temp_rgb)
+    filled = (arr_temp[:, :, 0] == 3) & (arr_temp[:, :, 1] == 7) & (arr_temp[:, :, 2] == 11)
+
+    if expand_px > 0:
+        filled_img = Image.fromarray((filled.astype(np.uint8)) * 255, mode="L")
+        filled_img = filled_img.filter(ImageFilter.MaxFilter(expand_px * 2 + 1))
+        filled = np.array(filled_img) > 127
+
+    arr = np.array(template.copy().convert("RGBA"), dtype=np.uint8)
+    arr[filled, 3] = 0
+    return Image.fromarray(arr)
+
+
+def render_welcome_preview(
+    people: list,
+    num_persons: int,
+    config: dict,
+) -> Image.Image:
+    template_key = f"welcome_{num_persons}"
+    tcfg = config["templates"][template_key]
+    template_path = Path(tcfg["path"])
+    if not template_path.is_absolute():
+        template_path = Path.cwd() / template_path
+
+    raw_template = Image.open(template_path).convert("RGBA")
+    out_w = int(tcfg.get("output_width", raw_template.width))
+    out_h = int(tcfg.get("output_height", raw_template.height))
+    if raw_template.size != (out_w, out_h):
+        raw_template = raw_template.resize((out_w, out_h), Image.Resampling.LANCZOS)
+
+    photo_boxes = tcfg.get("photo_boxes", [])
+    name_boxes = tcfg.get("name_boxes", [])
+    designation_boxes = tcfg.get("designation_boxes", [])
+
+    name_font_path = Path(tcfg.get("name_font_path", config.get("default_font_path", "")))
+    if not name_font_path.is_absolute():
+        name_font_path = Path.cwd() / name_font_path
+
+    des_font_path = Path(tcfg.get("designation_font_path", tcfg.get("name_font_path", config.get("default_font_path", ""))))
+    if not des_font_path.is_absolute():
+        des_font_path = Path.cwd() / des_font_path
+
+    # Build the template overlay: cut a precise hole for each ring so only
+    # the ring interior is transparent and photos show through from behind.
+    rect_holes = tcfg.get("rect_holes", [])
+    ring_seeds = tcfg.get("ring_seeds", [])
+    overlay = raw_template.copy().convert("RGBA")
+    if rect_holes:
+        for rh in rect_holes:
+            overlay = _cut_rect_hole(overlay, int(rh["x"]), int(rh["y"]), int(rh["width"]), int(rh["height"]))
+    elif ring_seeds:
+        for seed in ring_seeds:
+            overlay = _cut_ring_hole(overlay, int(seed["x"]), int(seed["y"]), expand_px=int(seed.get("expand_px", 0)))
+    else:
+        overlay = _make_non_white_overlay(overlay)
+
+    # White photo base sits behind the template overlay.
+    photo_base = Image.new("RGBA", (out_w, out_h), (255, 255, 255, 255))
+
+    for i, (uploaded, name, designation, scale, offset_x, offset_y, top_pct) in enumerate(people):
+        if i >= len(photo_boxes):
+            break
+        if uploaded is not None:
+            photo_box = dict(photo_boxes[i])
+            photo_box["photo_scale"] = scale
+            photo_box["photo_offset_x"] = offset_x
+            photo_box["photo_offset_y"] = offset_y
+            photo_box["photo_top_percent"] = top_pct
+            person = Image.open(uploaded).convert("RGBA")
+            person = maybe_extract_subject(person, photo_base.size, tcfg)
+            paste_photo(
+                base=photo_base,
+                person=person,
+                photo_box=photo_box,
+                shape=tcfg.get("photo_shape", "rectangle"),
+                fit_mode=tcfg.get("photo_fit", "cover"),
+                anchor=tcfg.get("photo_anchor", "center"),
+            )
+
+    # Template (ring decoration, gold border, chevrons) composited on top of photo.
+    base = Image.alpha_composite(photo_base, overlay)
+    draw = ImageDraw.Draw(base)
+
+    for i, (uploaded, name, designation, scale, offset_x, offset_y, top_pct) in enumerate(people):
+        if i >= len(photo_boxes):
+            break
+
+        if name.strip() and i < len(name_boxes):
+            name_box = name_boxes[i]
+            display_name = name.upper() if tcfg.get("name_uppercase", True) else name
+            name_font, name_w, name_h = fit_name_font(
+                draw=draw,
+                name=display_name,
+                box=name_box,
+                font_path=name_font_path,
+                max_size=int(tcfg.get("max_font_size", 48)),
+                min_size=int(tcfg.get("min_font_size", 18)),
+            )
+            align = tcfg.get("text_align", "center")
+            if align == "left":
+                nx = name_box["x"]
+            elif align == "right":
+                nx = name_box["x"] + name_box["width"] - name_w
+            else:
+                nx = name_box["x"] + (name_box["width"] - name_w) // 2
+            ny = name_box["y"]
+            draw.text((nx, ny), display_name, fill=tcfg.get("name_color", "#ffffff"), font=name_font)
+
+        if designation.strip() and i < len(designation_boxes):
+            des_box = designation_boxes[i]
+            des_font = get_font_safe(des_font_path, int(tcfg.get("designation_font_size", 26)))
+            des_text = designation.upper() if tcfg.get("designation_uppercase", False) else designation
+            des_align = tcfg.get("designation_align", "center")
+            box_w = int(des_box["width"])
+            box_h = int(des_box["height"])
+
+            des_bbox = draw.textbbox((0, 0), des_text, font=des_font)
+            des_w = des_bbox[2] - des_bbox[0]
+            des_h = des_bbox[3] - des_bbox[1]
+
+            if des_w <= box_w:
+                lines = [des_text]
+            else:
+                words = des_text.split()
+                best_split, best_max = 1, float('inf')
+                for j in range(1, len(words)):
+                    l1 = ' '.join(words[:j]); l2 = ' '.join(words[j:])
+                    w1 = draw.textbbox((0,0), l1, font=des_font)[2]
+                    w2 = draw.textbbox((0,0), l2, font=des_font)[2]
+                    if max(w1, w2) < best_max:
+                        best_max = max(w1, w2); best_split = j
+                lines = [' '.join(words[:best_split]), ' '.join(words[best_split:])]
+
+            line_gap = 4
+            dy_start = des_box["y"]
+            for li, line in enumerate(lines):
+                lw = draw.textbbox((0, 0), line, font=des_font)[2]
+                if des_align == "left":
+                    dx = des_box["x"]
+                elif des_align == "right":
+                    dx = des_box["x"] + box_w - lw
+                else:
+                    dx = des_box["x"] + (box_w - lw) // 2
+                draw.text((dx, dy_start + li * (des_h + line_gap)), line, fill=tcfg.get("designation_color", "#ffffff"), font=des_font)
+
+    return base
+
+
 st.set_page_config(page_title="Poster Studio", page_icon="🖼️", layout="wide")
 st.markdown("## Poster Studio")
 
 config = load_config(CONFIG_PATH)
-birthday_tab, anniversary_tab = st.tabs(["Birthday", "Anniversary"])
+birthday_tab, anniversary_tab, welcome_tab = st.tabs(["Birthday", "Anniversary", "Welcome"])
 
 with birthday_tab:
     left, right = st.columns([1, 1.35], gap="large")
@@ -421,3 +594,67 @@ with anniversary_tab:
                 use_container_width=True,
                 key="a_down",
             )
+
+with welcome_tab:
+    WELCOME_COUNTS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+    left, right = st.columns([1, 1.35], gap="large")
+
+    with left:
+        num_persons = st.selectbox("Number of persons", WELCOME_COUNTS, index=0, key="w_count")
+        template_key = f"welcome_{num_persons}"
+
+        if template_key not in config.get("templates", {}):
+            st.error(f"Template config for {num_persons} person(s) not found in config.json.")
+        else:
+            w_tcfg = config["templates"][template_key]
+            template_path_check = Path(w_tcfg["path"])
+            if not template_path_check.is_absolute():
+                template_path_check = Path.cwd() / template_path_check
+            if not template_path_check.exists():
+                st.warning(f"Template image not found: {w_tcfg['path']}. Please add it to the templates/ folder.")
+
+            people_inputs = []
+            for i in range(num_persons):
+                with st.expander(f"Person {i + 1}", expanded=(i == 0)):
+                    up = st.file_uploader(f"Photo", type=["png", "jpg", "jpeg", "webp"], key=f"w_up_{i}")
+                    nm = st.text_input("Name", value="", placeholder="Enter name", key=f"w_name_{i}")
+                    dg = st.text_input("Designation", value="", placeholder="Enter designation", key=f"w_des_{i}")
+                    default_pb = w_tcfg.get("photo_boxes", [{}] * num_persons)
+                    pb = default_pb[i] if i < len(default_pb) else {}
+                    sc = st.slider("Zoom", 0.5, 3.0, float(pb.get("photo_scale", 1.0)), 0.01, key=f"w_zoom_{i}")
+                    ox = st.slider("Move Left / Right", -500, 500, int(pb.get("photo_offset_x", 0)), 1, key=f"w_ox_{i}")
+                    oy = st.slider("Move Up / Down", -500, 500, int(pb.get("photo_offset_y", 0)), 1, key=f"w_oy_{i}")
+                    tp = st.slider("Visible Body Amount", 0.4, 1.0, float(pb.get("photo_top_percent", 1.0)), 0.01, key=f"w_tp_{i}")
+                    people_inputs.append((up, nm, dg, sc, ox, oy, tp))
+
+    with right:
+        if template_key not in config.get("templates", {}):
+            st.info("Select a valid template to preview.")
+        elif not template_path_check.exists():
+            st.info("Add the template image to see the preview.")
+        else:
+            any_photo = any(p[0] is not None for p in people_inputs)
+            any_name = any(p[1].strip() for p in people_inputs)
+            if not any_photo:
+                st.info("Upload at least one photo to preview.")
+            elif not any_name:
+                st.warning("Enter at least one name.")
+            else:
+                w_result = render_welcome_preview(
+                    people=people_inputs,
+                    num_persons=num_persons,
+                    config=config,
+                )
+                st.image(w_result, caption="Live Preview", use_container_width=True)
+                w_bytes = BytesIO()
+                w_result.save(w_bytes, format="PNG")
+                w_bytes.seek(0)
+                w_file = f"welcome_{num_persons}p_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png"
+                st.download_button(
+                    "Download Welcome PNG",
+                    data=w_bytes,
+                    file_name=w_file,
+                    mime="image/png",
+                    use_container_width=True,
+                    key="w_down",
+                )
