@@ -578,7 +578,7 @@ with birthday_tab:
             png_bytes = BytesIO()
             result.save(png_bytes, format="PNG")
             png_bytes.seek(0)
-            file_name = f"{occasion}_{name.strip().replace(' ', '_')}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png"
+            file_name = f"Birthday_{name.strip().replace(' ', '_')}.png"
             st.download_button(
                 "Download PNG",
                 data=png_bytes,
@@ -626,7 +626,7 @@ with anniversary_tab:
             ann_bytes = BytesIO()
             ann_result.save(ann_bytes, format="PNG")
             ann_bytes.seek(0)
-            ann_file = f"employee_anniversary_{ann_name.strip().replace(' ', '_')}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png"
+            ann_file = f"Anniversary_{ann_name.strip().replace(' ', '_')}.png"
             st.download_button(
                 "Download Anniversary PNG",
                 data=ann_bytes,
@@ -686,11 +686,13 @@ with welcome_tab:
                     num_persons=num_persons,
                     config=config,
                 )
-                st.image(_preview_jpeg(w_result), caption="Live Preview", use_container_width=True)
+                st.image(w_result, caption="Live Preview", use_container_width=True)
                 w_bytes = BytesIO()
                 w_result.save(w_bytes, format="PNG")
                 w_bytes.seek(0)
-                w_file = f"welcome_{num_persons}p_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png"
+                first_name = next((p[1].strip() for p in people_inputs if p[1].strip()), "")
+                w_name_part = f"_{first_name.replace(' ', '_')}" if first_name else ""
+                w_file = f"Welcome{w_name_part}_{num_persons}p.png"
                 st.download_button(
                     "Download Welcome PNG",
                     data=w_bytes,
