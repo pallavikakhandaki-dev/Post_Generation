@@ -151,17 +151,17 @@
       ],
       "name_boxes": [
         {
-          "x": 35,
-          "y": 396,
-          "width": 510,
+          "x": 55,
+          "y": 436,
+          "width": 500,
           "height": 52
         }
       ],
       "designation_boxes": [
         {
-          "x": 35,
-          "y": 452,
-          "width": 510,
+          "x": 55,
+          "y": 492,
+          "width": 500,
           "height": 44
         }
       ]
