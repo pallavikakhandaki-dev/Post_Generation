@@ -11,14 +11,12 @@ from typing import Dict, Tuple
 import requests
 import numpy as np
 from PIL import Image, ImageChops, ImageDraw, ImageFilter, ImageFont
-try:
-    from rembg import remove as rembg_remove
-except Exception:
-    rembg_remove = None
-try:
-    import cv2
-except Exception:
-    cv2 = None
+
+# rembg and cv2 are loaded lazily inside remove_background_rembg() the first
+# time background removal is actually requested, so app startup is not penalised
+# when every template has remove_background=false (the common case).
+_rembg_remove = None   # module-level cache after first lazy load
+_cv2 = None            # module-level cache after first lazy load
 
 
 def load_config(config_path: Path) -> Dict:
@@ -190,28 +188,45 @@ def remove_background_grabcut(photo: Image.Image) -> Image.Image:
 
 
 def remove_background_rembg(photo: Image.Image) -> Image.Image:
-    if rembg_remove is None:
+    # Lazy-load rembg and cv2 on first use so app startup stays fast when
+    # remove_background=false (no import penalty at module load time).
+    global _rembg_remove, _cv2
+    if _rembg_remove is None:
+        try:
+            from rembg import remove as _fn
+            _rembg_remove = _fn
+        except Exception:
+            _rembg_remove = False  # sentinel: tried and failed
+    if _rembg_remove is False:
         return photo
-    out = rembg_remove(photo.convert("RGBA")).convert("RGBA")
-    if cv2 is None:
+
+    if _cv2 is None:
+        try:
+            import cv2 as _cv2_mod
+            _cv2 = _cv2_mod
+        except Exception:
+            _cv2 = False  # sentinel: tried and failed
+
+    out = _rembg_remove(photo.convert("RGBA")).convert("RGBA")
+    if _cv2 is False:
         return out
 
     arr = np.array(out)
     alpha = arr[:, :, 3]
     # Binarize alpha and keep only the largest connected foreground region.
-    _, bin_alpha = cv2.threshold(alpha, 16, 255, cv2.THRESH_BINARY)
-    num_labels, labels, stats, _ = cv2.connectedComponentsWithStats((bin_alpha > 0).astype(np.uint8), 8)
+    _, bin_alpha = _cv2.threshold(alpha, 16, 255, _cv2.THRESH_BINARY)
+    num_labels, labels, stats, _ = _cv2.connectedComponentsWithStats((bin_alpha > 0).astype(np.uint8), 8)
     if num_labels > 1:
         # Skip background label 0.
-        largest = 1 + np.argmax(stats[1:, cv2.CC_STAT_AREA])
+        largest = 1 + np.argmax(stats[1:, _cv2.CC_STAT_AREA])
         clean = np.where(labels == largest, 255, 0).astype(np.uint8)
     else:
         clean = bin_alpha
 
     # Smooth edge and close pinholes.
     kernel = np.ones((3, 3), np.uint8)
-    clean = cv2.morphologyEx(clean, cv2.MORPH_CLOSE, kernel, iterations=1)
-    clean = cv2.GaussianBlur(clean, (0, 0), 0.8)
+    clean = _cv2.morphologyEx(clean, _cv2.MORPH_CLOSE, kernel, iterations=1)
+    clean = _cv2.GaussianBlur(clean, (0, 0), 0.8)
     arr[:, :, 3] = clean
     return Image.fromarray(arr, mode="RGBA")
 

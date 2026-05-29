@@ -327,6 +327,38 @@ def _cut_ring_hole(template: Image.Image, seed_x: int, seed_y: int, thresh: int 
     return Image.fromarray(arr)
 
 
+@st.cache_resource
+def _get_template_overlay(template_key: str) -> Image.Image:
+    """Load the template image and compute its transparency overlay once per
+    app session.  The result is cached in memory so every subsequent render
+    just reads from RAM instead of re-opening and re-processing the file.
+    """
+    cfg = load_config(CONFIG_PATH)
+    tcfg = cfg["templates"][template_key]
+    tpl_path = Path(tcfg["path"])
+    if not tpl_path.is_absolute():
+        tpl_path = Path.cwd() / tpl_path
+
+    out_w = int(tcfg.get("output_width", 1080))
+    out_h = int(tcfg.get("output_height", 1080))
+    raw = Image.open(tpl_path).convert("RGBA")
+    if raw.size != (out_w, out_h):
+        raw = raw.resize((out_w, out_h), Image.Resampling.LANCZOS)
+
+    overlay = raw.copy()
+    rect_holes = tcfg.get("rect_holes", [])
+    ring_seeds = tcfg.get("ring_seeds", [])
+    if rect_holes:
+        for rh in rect_holes:
+            overlay = _cut_rect_hole(overlay, int(rh["x"]), int(rh["y"]), int(rh["width"]), int(rh["height"]))
+    elif ring_seeds:
+        for seed in ring_seeds:
+            overlay = _cut_ring_hole(overlay, int(seed["x"]), int(seed["y"]), expand_px=int(seed.get("expand_px", 0)))
+    else:
+        overlay = _make_non_white_overlay(overlay)
+    return overlay
+
+
 def render_welcome_preview(
     people: list,
     num_persons: int,
@@ -334,15 +366,9 @@ def render_welcome_preview(
 ) -> Image.Image:
     template_key = f"welcome_{num_persons}"
     tcfg = config["templates"][template_key]
-    template_path = Path(tcfg["path"])
-    if not template_path.is_absolute():
-        template_path = Path.cwd() / template_path
 
-    raw_template = Image.open(template_path).convert("RGBA")
-    out_w = int(tcfg.get("output_width", raw_template.width))
-    out_h = int(tcfg.get("output_height", raw_template.height))
-    if raw_template.size != (out_w, out_h):
-        raw_template = raw_template.resize((out_w, out_h), Image.Resampling.LANCZOS)
+    out_w = int(tcfg.get("output_width", 1080))
+    out_h = int(tcfg.get("output_height", 1080))
 
     photo_boxes = tcfg.get("photo_boxes", [])
     name_boxes = tcfg.get("name_boxes", [])
@@ -356,19 +382,9 @@ def render_welcome_preview(
     if not des_font_path.is_absolute():
         des_font_path = Path.cwd() / des_font_path
 
-    # Build the template overlay: cut a precise hole for each ring so only
-    # the ring interior is transparent and photos show through from behind.
-    rect_holes = tcfg.get("rect_holes", [])
-    ring_seeds = tcfg.get("ring_seeds", [])
-    overlay = raw_template.copy().convert("RGBA")
-    if rect_holes:
-        for rh in rect_holes:
-            overlay = _cut_rect_hole(overlay, int(rh["x"]), int(rh["y"]), int(rh["width"]), int(rh["height"]))
-    elif ring_seeds:
-        for seed in ring_seeds:
-            overlay = _cut_ring_hole(overlay, int(seed["x"]), int(seed["y"]), expand_px=int(seed.get("expand_px", 0)))
-    else:
-        overlay = _make_non_white_overlay(overlay)
+    # Overlay retrieved from cache (file load + transparency computation only
+    # happens once per template on first use; free on all subsequent renders).
+    overlay = _get_template_overlay(template_key)
 
     # White photo base sits behind the template overlay.
     photo_base = Image.new("RGBA", (out_w, out_h), (255, 255, 255, 255))
