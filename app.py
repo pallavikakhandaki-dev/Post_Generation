@@ -478,7 +478,32 @@ def render_welcome_preview(
     return base
 
 
+def _preview_jpeg(img: Image.Image, quality: int = 88) -> BytesIO:
+    """Convert a PIL image to a JPEG BytesIO for fast st.image() display.
+    JPEG is ~10-20x smaller than PNG for preview purposes, so it loads
+    much faster over the network on Hugging Face."""
+    buf = BytesIO()
+    # JPEG doesn't support alpha — flatten onto white background first
+    flat = Image.new("RGB", img.size, (255, 255, 255))
+    flat.paste(img.convert("RGBA"), mask=img.convert("RGBA").split()[3])
+    flat.save(buf, format="JPEG", quality=quality, optimize=True)
+    buf.seek(0)
+    return buf
+
+
 st.set_page_config(page_title="Poster Studio", page_icon="🖼️", layout="wide")
+
+# Hide Streamlit's white "re-running" blur overlay that appears on every
+# slider/upload interaction — keeps the UI clean during renders.
+st.markdown("""
+<style>
+div[data-testid="stStatusWidget"] { display: none; }
+.stApp > header { display: none; }
+iframe[title="streamlit_analytics"] { display: none; }
+[data-testid="stAppViewBlockContainer"] > div > div[style*="opacity: 0"] { opacity: 1 !important; }
+</style>
+""", unsafe_allow_html=True)
+
 st.markdown("## Poster Studio")
 
 config = load_config(CONFIG_PATH)
@@ -549,7 +574,7 @@ with birthday_tab:
                 photo_offset_y=offset_y,
                 photo_top_percent=top_pct,
             )
-            st.image(result, caption="Live Preview", use_container_width=True)
+            st.image(_preview_jpeg(result), caption="Live Preview", use_container_width=True)
             png_bytes = BytesIO()
             result.save(png_bytes, format="PNG")
             png_bytes.seek(0)
@@ -597,7 +622,7 @@ with anniversary_tab:
                 photo_offset_y=ann_y,
                 photo_top_percent=ann_top,
             )
-            st.image(ann_result, caption="Live Preview", use_container_width=True)
+            st.image(_preview_jpeg(ann_result), caption="Live Preview", use_container_width=True)
             ann_bytes = BytesIO()
             ann_result.save(ann_bytes, format="PNG")
             ann_bytes.seek(0)
@@ -661,7 +686,7 @@ with welcome_tab:
                     num_persons=num_persons,
                     config=config,
                 )
-                st.image(w_result, caption="Live Preview", use_container_width=True)
+                st.image(_preview_jpeg(w_result), caption="Live Preview", use_container_width=True)
                 w_bytes = BytesIO()
                 w_result.save(w_bytes, format="PNG")
                 w_bytes.seek(0)
